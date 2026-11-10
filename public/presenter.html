@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presenter</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <main class="presenter">
+    <div class="where">
+      <span class="chip" id="where">Presenter</span>
+      <span class="status" id="status">Offline</span>
+    </div>
+    <div id="content" class="col"></div>
+  </main>
+
+  <div id="pin-gate" hidden>
+    <form>
+      <h1>Enter the PIN</h1>
+      <input type="password" inputmode="numeric" autocomplete="off" aria-label="PIN">
+      <div class="pin-note" hidden>That PIN was not accepted.</div>
+      <button class="primary" type="submit">Open</button>
+    </form>
+  </div>
+
+  <script type="module" src="/js/presenter.js"></script>
+</body>
+</html>

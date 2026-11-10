@@ -1,0 +1,49 @@
+[
+  {
+    "id": "sample-1",
+    "question": "Name something people do as soon as they arrive at the office.",
+    "answers": [
+      "Make coffee",
+      "Check email",
+      "Greet coworkers",
+      "Turn on the computer",
+      "Eat breakfast",
+      "Check their phone"
+    ]
+  },
+  {
+    "id": "sample-2",
+    "question": "Name an excuse people give for being late to work.",
+    "answers": [
+      "Traffic",
+      "Overslept",
+      "Heavy rain",
+      "Vehicle trouble",
+      "Family emergency"
+    ]
+  },
+  {
+    "id": "sample-3",
+    "question": "Name something you always find on an office desk.",
+    "answers": [
+      "Laptop",
+      "Coffee mug",
+      "Pens",
+      "Sticky notes",
+      "Phone charger",
+      "Snacks",
+      "Water bottle",
+      "Tissues"
+    ]
+  },
+  {
+    "id": "sample-4",
+    "question": "Name a food people order when they work overtime.",
+    "answers": [
+      "Fried rice",
+      "Pizza",
+      "Fried chicken",
+      "Noodles"
+    ]
+  }
+]

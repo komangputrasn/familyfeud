@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin · Control room</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">Control room</div>
+    <nav class="tabs">
+      <button type="button" data-tab="play" class="on">Play</button>
+      <button type="button" data-tab="questions">Questions</button>
+      <button type="button" data-tab="settings">Settings</button>
+    </nav>
+    <div class="status" id="status">Offline</div>
+  </header>
+
+  <main>
+    <section id="tab-play" class="play">
+      <div class="col">
+        <div class="card" id="round-card"></div>
+
+        <div class="card">
+          <h2>Judge an answer</h2>
+          <form id="judge-form">
+            <input id="guess" type="text" maxlength="200" autocomplete="off"
+              placeholder="Type what the contestant said, then press Enter">
+            <button class="primary big" type="submit">Judge</button>
+          </form>
+          <div id="verdict"></div>
+        </div>
+
+        <div class="card">
+          <h2>Answers on the board</h2>
+          <div id="answers"></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card" id="strike-card"></div>
+        <div class="card" id="screen-card"></div>
+      </div>
+    </section>
+
+    <section id="tab-questions" hidden>
+      <div class="q-toolbar">
+        <button type="button" class="primary" data-act="saveQuestions">Save changes</button>
+        <button type="button" data-act="addQuestion">+ Add question</button>
+        <button type="button" data-act="exportQuestions">Export</button>
+        <button type="button" data-act="importQuestions">Import</button>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
+        <span class="muted" id="q-status"></span>
+      </div>
+      <div id="q-list"></div>
+    </section>
+
+    <section id="tab-settings" class="settings" hidden>
+      <div class="card">
+        <h2>Board</h2>
+        <form id="settings-form">
+          <div class="field">
+            <label for="s-title">Game title</label>
+            <input id="s-title" name="title" type="text" maxlength="60">
+          </div>
+          <div class="field">
+            <label for="s-subtitle">Line under the title</label>
+            <input id="s-subtitle" name="subtitle" type="text" maxlength="60">
+          </div>
+          <div class="field">
+            <label for="s-toplabel">Label shown with the top answer</label>
+            <input id="s-toplabel" name="topLabel" type="text" maxlength="30">
+          </div>
+          <div class="field">
+            <label for="s-strikes">Strikes per question</label>
+            <input id="s-strikes" name="maxStrikes" type="number" min="1" max="5" step="1">
+          </div>
+          <div class="field">
+            <label class="check"><input name="drumrollOnTop" type="checkbox"> Drum roll before the top answer</label>
+          </div>
+          <div class="field">
+            <label for="s-cue">Reveal at (seconds into the drum roll)</label>
+            <input id="s-cue" name="drumrollCue" type="number" min="0" max="120" step="0.1">
+            <div class="hint">0 reveals when the track ends. Set a time if your track's big hit lands before the end.</div>
+          </div>
+          <div class="field">
+            <button class="primary" type="submit">Save settings</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Sound check</h2>
+        <p class="muted">These play on the board screen. Click the board once first so the browser allows sound.</p>
+        <div class="row-line">
+          <button type="button" data-act="testSound" data-name="ding">Reveal ding</button>
+          <button type="button" data-act="testSound" data-name="buzzer">Strike buzzer</button>
+          <button type="button" class="drum" data-act="testSound" data-name="drumroll">Drum roll</button>
+        </div>
+        <dl class="kv" id="audio-info" style="margin-top:16px"></dl>
+      </div>
+
+      <div class="card">
+        <h2>Connection</h2>
+        <dl class="kv" id="conn-info"></dl>
+      </div>
+
+      <div class="card">
+        <h2>Reset</h2>
+        <p class="muted">Goes back to the title screen and clears the current board. Questions and settings are kept.</p>
+        <button type="button" class="stop" data-act="reset">Reset the game</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="pin-gate" hidden>
+    <form>
+      <h1>Enter the PIN</h1>
+      <input type="password" inputmode="numeric" autocomplete="off" aria-label="PIN">
+      <div class="pin-note" hidden>That PIN was not accepted.</div>
+      <button class="primary" type="submit">Open</button>
+    </form>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+
+  <script type="module" src="/js/admin.js"></script>
+</body>
+</html>

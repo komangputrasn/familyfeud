@@ -1,0 +1,16 @@
+{
+  "name": "survey-showdown",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Survey-guessing party game: projector board, operator console with a Claude judge, and a host cheat sheet.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node check-judge.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.7.0",
+    "express": "^5.3.0",
+    "ws": "^8.22.2"
+  }
+}

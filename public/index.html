@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game Board</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/css/board.css">
+</head>
+<body>
+  <div id="bg"><div class="streaks"></div></div>
+  <canvas id="sparkles-back"></canvas>
+
+  <div id="stage">
+    <section id="title-screen" class="screen on">
+      <div class="rays"></div>
+      <div class="plaque">
+        <h1 id="logo-title"></h1>
+      </div>
+      <div id="logo-sub" class="ribbon"></div>
+    </section>
+
+    <section id="round-screen" class="screen">
+      <div id="question" class="qpanel">
+        <div id="question-text"></div>
+        <div class="q-wait"><i></i><i></i><i></i></div>
+      </div>
+      <div id="rows"></div>
+      <div id="strikes"></div>
+      <div id="dim"></div>
+    </section>
+
+    <div id="fx"></div>
+  </div>
+
+  <canvas id="sparkles-front"></canvas>
+  <div id="flash"></div>
+
+  <button id="start" type="button"><span>Click anywhere to turn the sound on &nbsp;·&nbsp; F for fullscreen</span></button>
+  <div id="offline">Reconnecting…</div>
+
+  <script type="module" src="/js/board.js"></script>
+</body>
+</html>
