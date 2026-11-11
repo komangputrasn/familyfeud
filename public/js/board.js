@@ -288,7 +288,7 @@ async function quietReveal(row, text) {
 // Dims the whole board and sweeps the beams while the drum roll plays. No row is
 // singled out, so the audience can't tell which answer is about to appear.
 // Resolves with how many ms of the track are still playing after the reveal fires.
-async function drumRoll(cueSeconds, tease = false) {
+async function drumRoll(cueSeconds, tease = false, payoff = true) {
   const beams = [el('div', 'beam l'), el('div', 'beam r')];
   fx.append(...beams);
   dim(0.82);
@@ -307,8 +307,11 @@ async function drumRoll(cueSeconds, tease = false) {
 
   beams.forEach((beam) => beam.classList.remove('on'));
   setTimeout(() => beams.forEach((beam) => beam.remove()), 600);
-  if (synthesized) sound.crash();
-  flash('#fff', 0.9, 700);
+  // A roll that ends in a strike gets no crash or white flash: the buzzer is the payoff.
+  if (payoff) {
+    if (synthesized) sound.crash();
+    flash('#fff', 0.9, 700);
+  }
   return left ? left() : 0;
 }
 
@@ -479,7 +482,9 @@ async function acceptedGuess(text) {
   dim(0);
 }
 
-async function strike(group, count) {
+async function strike(group, count, withDrumRoll, settings) {
+  // Build it up like a big reveal, then hit them with the X.
+  if (withDrumRoll) await drumRoll(settings.drumrollCue, true, false);
   const slot = groupCells?.wrong[group]?.querySelector('.g-x');
   const size = 620;
   const left = (W - size) / 2;
@@ -571,7 +576,7 @@ async function play(event, state) {
       break;
 
     case 'strike':
-      if (sameBoard) await strike(event.group, event.count);
+      if (sameBoard) await strike(event.group, event.count, event.drum, state.settings);
       break;
 
     case 'accepted':

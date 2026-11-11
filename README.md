@@ -36,6 +36,7 @@ The admin and presenter pages ask for the PIN from `.env`. The board needs no PI
   - **Reveal** plays the big-text reveal. On the top answer it plays the drum roll first.
   - **Drum roll / No drum roll** switches the drum roll on or off for that one reveal.
   - **Quiet** flips the answer open with no fanfare.
+- While the top answer is still hidden, a regular answer or a strike sometimes gets a fake-out drum roll first. **Fake-out drum roll chance** in Admin > Settings sets how often; 0 turns it off.
 - **Reveal all remaining answers** opens what nobody guessed, bottom to top. It gives no points.
 
 ### Groups and scores
@@ -58,7 +59,7 @@ Put files in `public/audio/` with these names (`.mp3`, `.wav`, `.ogg` or `.m4a`)
 | File | Plays |
 |---|---|
 | `drumroll.mp3` | Before the top answer is revealed |
-| `tease.mp3` | Fake-out drum roll on a regular answer; stops at the same **Reveal at** time as the real one (optional, falls back to the drum roll) |
+| `tease.mp3` | Fake-out drum roll on a regular answer or a strike; stops at the same **Reveal at** time as the real one (optional, falls back to the drum roll) |
 | `reveal.mp3` | When an answer is revealed (optional) |
 | `strike.mp3` | On a wrong answer (optional) |
 

@@ -66,7 +66,7 @@ const DEFAULT_SETTINGS = {
   topLabel: 'Top Answer',
   drumrollOnTop: true,
   drumrollCue: 3.26, // seconds into the drum-roll track at which the reveal fires (just before drumroll.wav's beat drop); 0 = when it ends
-  drumrollTease: 25, // % chance a regular answer also gets the drum roll while the top answer is still hidden
+  drumrollTease: 25, // % chance a regular answer or a strike also gets the drum roll while the top answer is still hidden
 };
 
 let questions = cleanQuestions(readJson(QUESTIONS_FILE, []));
@@ -363,7 +363,9 @@ const actions = {
     round.strikes += 1;
     state.phase = 'round';
     state.judge = null;
-    return { kind: 'strike', group, count: target.wrong };
+    // Same fake-out chance as a regular answer: while the top answer is hidden, a roll could go either way.
+    const drum = !round.answers[0].revealed && Math.random() * 100 < state.settings.drumrollTease;
+    return { kind: 'strike', group, count: target.wrong, drum };
   },
 
   unstrike({ group }) {
