@@ -187,6 +187,7 @@ main { padding: 20px; max-width: 1400px; margin: 0 auto; }
 }
 .verdict.match { border-color: var(--green); background: rgba(34, 197, 94, .1); }
 .verdict.miss { border-color: var(--red); background: rgba(239, 68, 68, .1); }
+.verdict.extra { border-color: var(--blue); background: rgba(59, 130, 246, .1); }
 .verdict.warn { border-color: var(--gold); background: rgba(245, 184, 46, .1); }
 .verdict .headline { font-size: 24px; font-weight: 800; line-height: 1.2; }
 .verdict .reason { margin: 6px 0 14px; color: var(--muted); }

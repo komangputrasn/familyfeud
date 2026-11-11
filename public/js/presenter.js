@@ -12,6 +12,10 @@ function verdictHtml(judge, round) {
     return `<div class="verdict warn">${guess}<div class="headline">The judge could not answer</div>
       <div class="reason">The operator will decide this one.</div></div>`;
   }
+  if (judge.match === null && judge.extra) {
+    return `<div class="verdict extra">${guess}<div class="headline">✔ Good answer, not on the board: ${h(judge.extra)}</div>
+      <div class="reason">${h(judge.reason)} The operator can add it to the board.</div></div>`;
+  }
   if (judge.match === null) {
     return `<div class="verdict miss">${guess}<div class="headline">✖ Not on the board</div>
       <div class="reason">${h(judge.reason)}</div></div>`;

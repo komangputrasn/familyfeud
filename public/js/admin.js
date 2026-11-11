@@ -91,6 +91,22 @@ function verdictHtml() {
 
   const confidence = `<span class="chip">${h(judge.confidence)} confidence</span>`;
 
+  if (judge.match === null && judge.extra) {
+    const full = round.answers.length >= (state.info?.maxAnswers ?? 8);
+    const add = full
+      ? '<span class="chip gold">The board is full</span>'
+      : `<button type="button" class="go big" data-primary data-act="addAnswer">Add “${h(judge.extra)}” to the board</button>`;
+    return `<div class="verdict extra">${guess}
+      <div class="headline">✔ Good answer, not on the board</div>
+      <div class="reason">${h(judge.reason)} ${confidence}</div>
+      <div class="row-line">
+        ${add}
+        ${strikeButton(full ? 'big' : '', full ? 'Strike ✖' : 'Strike instead', full)}
+        ${dismiss()}
+      </div>
+    </div>`;
+  }
+
   if (judge.match === null) {
     return `<div class="verdict miss">${guess}
       <div class="headline">✖ Not on the board</div>
@@ -163,7 +179,7 @@ function renderAnswers() {
            <button type="button" class="small" data-act="reveal" data-i="${i}" data-mode="quiet" title="Flip it open with no fanfare">Quiet</button>`;
       return `<div class="ans ${answer.revealed ? 'shown' : ''} ${suggested ? 'suggested' : ''}">
         <span class="num">${i + 1}</span>
-        <span class="txt">${h(answer.text)} ${i === 0 ? '<span class="chip gold">Top answer</span>' : ''}</span>
+        <span class="txt">${h(answer.text)} ${i === 0 ? '<span class="chip gold">Top answer</span>' : ''}${answer.added ? ' <span class="chip">Added</span>' : ''}</span>
         <span class="btns">${buttons}</span>
       </div>`;
     })
@@ -260,6 +276,7 @@ function renderEditor() {
             <div class="q-head">
               <span class="q-num">${i + 1}</span>
               <input type="text" class="q-text" value="${h(item.question)}" placeholder="Question" aria-label="Question ${i + 1}">
+              ${writeButton(item)}
               <button type="button" class="small" data-act="moveUp" title="Move up" ${i === 0 ? 'disabled' : ''}>▲</button>
               <button type="button" class="small" data-act="moveDown" title="Move down" ${i === draft.length - 1 ? 'disabled' : ''}>▼</button>
               <button type="button" class="small stop" data-act="deleteQuestion">Delete</button>
@@ -273,6 +290,45 @@ function renderEditor() {
   renderEditorStatus();
 }
 
+const writing = new Set(); // draft items Claude is writing answers for
+
+function writeButton(item) {
+  if (writing.has(item)) return '<button type="button" class="small" disabled><span class="spinner"></span> Thinking…</button>';
+  const noKey = !state?.info?.hasKey;
+  const title = noKey
+    ? 'Add ANTHROPIC_API_KEY to .env to use this.'
+    : item.question.trim()
+      ? 'Claude writes the most popular answers for this question.'
+      : 'Leave the question blank and Claude writes a new question with its answers.';
+  return `<button type="button" class="small" data-act="writeAnswers" title="${title}" ${noKey ? 'disabled' : ''}>✨ Ask Claude</button>`;
+}
+
+async function writeAnswers(button) {
+  const item = draft[Number(button.closest('.q-edit').dataset.q)];
+  if (answersOf(item).length && !confirm('Replace the answers on this question with ones Claude writes?')) return;
+  writing.add(item);
+  renderEditor();
+  try {
+    const response = await fetch('/api/write-answers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Pin': pin.get() },
+      body: JSON.stringify({ question: item.question, existing: draft.map((q) => q.question.trim()).filter(Boolean) }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || `The server answered ${response.status}.`);
+    if (!draft.includes(item)) return; // deleted while Claude was writing
+    if (!item.question.trim()) item.question = result.question;
+    item.answersText = result.answers.join('\n');
+    markDirty();
+    toast('Claude wrote the answers. Check them, then press Save changes.', true);
+  } catch (err) {
+    toast(err.message || 'Claude could not write answers.');
+  } finally {
+    writing.delete(item);
+    renderEditor();
+  }
+}
+
 function renderEditorStatus() {
   $('#q-status').textContent = dirty ? 'Unsaved changes' : `${draft.length} question${draft.length === 1 ? '' : 's'} saved`;
 }
@@ -283,7 +339,7 @@ function syncEditor() {
     dirty = false;
     toast('Questions saved.', true);
   }
-  if (dirty) return;
+  if (dirty || writing.size) return;
   const source = JSON.stringify(state.questions);
   if (source === draftSource) return;
   draftSource = source;
@@ -461,12 +517,14 @@ const handlers = {
   clearStrikes: () => net.send('clearStrikes'),
   clearJudge: () => net.send('clearJudge'),
   retryJudge: () => net.send('judge', { guess: state.judge.guess }),
+  addAnswer: () => net.send('addAnswer', { text: state.judge.extra }),
   testSound: (button) => net.send('testSound', { name: button.dataset.name }),
   reset() {
     if (confirm('Go back to the title screen and clear the current board?')) net.send('reset');
   },
 
   saveQuestions,
+  writeAnswers,
   exportQuestions,
   importQuestions: () => $('#import-file').click(),
   addQuestion() {

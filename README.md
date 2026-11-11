@@ -32,6 +32,8 @@ The admin and presenter pages ask for the PIN from `.env`. The board needs no PI
 - Open the board in **its own browser window** on the projector, click it once (browsers block sound until a click) and press **F** for fullscreen. Keep that window visible: a browser pauses animations in a hidden tab.
 - In Admin > Play, pick a question and press **Start this question**.
 - Type what the contestant said and press **Enter**. When the verdict appears, press **Enter** again to accept it (reveal or strike), or use the buttons to overrule it.
+- The judge is generous: a specific kind of an answer counts, so "ramen" matches "Noodles".
+- When a guess is not on the board but is still a good answer, the verdict says **Good answer, not on the board** and offers **Add to the board**. That puts it on the bottom row and reveals it, for this round only; the saved question is not changed. The board fits 8 answers at most.
 - Every answer also has manual buttons, which work without the judge:
   - **Reveal** plays the big-text reveal. On the top answer it plays the drum roll first.
   - **Drum roll / No drum roll** switches the drum roll on or off for that one reveal.
@@ -40,7 +42,11 @@ The admin and presenter pages ask for the PIN from `.env`. The board needs no PI
 
 ## Questions
 
-Edit them in Admin > Questions: one answer per line, most popular first, up to 8 per question. The first line is the top answer. They are stored in `data/questions.json`, which you can also edit by hand or swap using Import and Export. The four questions that ship with the game are samples.
+Edit them in Admin > Questions: one answer per line, most popular first, up to 8 per question. The first line is the top answer. 
+
+**✨ Ask Claude** on a question writes its answers for you, ranked by how popular Claude thinks they are, in the question's language. Leave the question blank and Claude writes a new question as well. Claude's answers go into the editor without being saved: check and edit them, then press **Save changes**. They are Claude's estimate, not a real survey.
+
+They are stored in `data/questions.json`, which you can also edit by hand or swap using Import and Export. The four questions that ship with the game are samples.
 
 ## Your own sounds
 

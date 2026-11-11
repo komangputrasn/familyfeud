@@ -169,7 +169,7 @@ function render(state) {
   titleScreen.classList.toggle('on', !inRound);
   roundScreen.classList.toggle('on', inRound);
   if (!state.round) return;
-  if (state.round.runId !== rowsKey) buildRows(state.round);
+  if (state.round.runId !== rowsKey || rowEls.length !== state.round.answers.length) buildRows(state.round);
   state.round.answers.forEach((answer, i) => drawRow(rowEls[i], answer));
   drawQuestion(state.round);
   drawStrikes(state.round.strikes, state.settings.maxStrikes);
@@ -437,6 +437,12 @@ async function play(event, state) {
       break;
 
     case 'reveal': {
+      // An answer added mid-round: rebuild the rows to make room, keeping the new one closed
+      // so it can be revealed with the usual animation.
+      if (sameBoard && rowEls.length !== round.answers.length) {
+        buildRows(round);
+        round.answers.forEach((answer, i) => drawRow(rowEls[i], i === event.index ? { revealed: false } : answer));
+      }
       const row = rowEls[event.index];
       if (!sameBoard || !row || row.classList.contains('revealed')) break;
       const text = round.answers[event.index].text;

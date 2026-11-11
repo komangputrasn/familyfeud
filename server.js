@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { WebSocketServer } from 'ws';
-import { askJudge, describeJudgeError, hasCredentials, JUDGE_MODEL } from './judge.js';
+import { askJudge, describeJudgeError, hasCredentials, JUDGE_MODEL, writeAnswers } from './judge.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -256,6 +256,22 @@ const actions = {
     return { kind: 'reveal', index, mode: resolved };
   },
 
+  // A valid answer that was not in the survey: goes on the bottom of this round's board and is
+  // revealed right away. The saved question list is not changed.
+  addAnswer({ text }) {
+    const round = requireRound();
+    const label = String(text ?? '').trim().slice(0, 60);
+    if (!label) throw new Error('Type the answer to add.');
+    if (round.answers.length >= MAX_ANSWERS) throw new Error(`The board is full: it fits ${MAX_ANSWERS} answers.`);
+    if (round.answers.some((a) => a.text.toLowerCase() === label.toLowerCase())) {
+      throw new Error(`"${label}" is already on the board.`);
+    }
+    round.answers.push({ text: label, revealed: true, added: true });
+    state.phase = 'round';
+    state.judge = null;
+    return { kind: 'reveal', index: round.answers.length - 1, mode: 'normal' };
+  },
+
   hide({ index }) {
     answerAt(requireRound(), index).revealed = false;
   },
@@ -346,6 +362,20 @@ const actions = {
 
 const app = express();
 app.get('/api/audio', (req, res) => res.json(audioManifest()));
+
+// Admin only: Claude drafts a ranked answer list (and the question, when it is blank) for the editor.
+// Nothing is saved here; the operator reviews the draft and saves it from the Questions tab.
+app.post('/api/write-answers', express.json({ limit: '64kb' }), async (req, res) => {
+  if (PIN && req.get('x-pin') !== PIN) return res.status(401).json({ error: 'Wrong PIN. Reload the page.' });
+  const question = String(req.body?.question ?? '').trim().slice(0, 300);
+  const existing = Array.isArray(req.body?.existing) ? req.body.existing.map((q) => String(q).slice(0, 300)) : [];
+  try {
+    res.json(await writeAnswers(question, { existing, max: MAX_ANSWERS }));
+  } catch (err) {
+    console.error('Answer writer error:', err?.message || err);
+    res.status(502).json({ error: describeJudgeError(err) });
+  }
+});
 app.use(
   express.static(path.join(here, 'public'), {
     extensions: ['html'],
