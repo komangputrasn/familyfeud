@@ -202,7 +202,9 @@ export class Sound {
         const reached = this.untilPosition(element, cue).then(() => {
           if (tease) element.pause();
         });
-        return { ms: cue * 1000, synthesized: false, reached };
+        // How much of the real roll is still to play once the reveal fires (0 for a fake-out).
+        const left = () => (tease || element.paused ? 0 : Math.max(0, (length - element.currentTime) * 1000));
+        return { ms: cue * 1000, synthesized: false, reached, left };
       } catch {
         // Blocked or broken file: fall through to the built-in roll.
       }

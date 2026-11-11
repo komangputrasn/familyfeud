@@ -287,6 +287,7 @@ async function quietReveal(row, text) {
 
 // Dims the whole board and sweeps the beams while the drum roll plays. No row is
 // singled out, so the audience can't tell which answer is about to appear.
+// Resolves with how many ms of the track are still playing after the reveal fires.
 async function drumRoll(cueSeconds, tease = false) {
   const beams = [el('div', 'beam l'), el('div', 'beam r')];
   fx.append(...beams);
@@ -294,7 +295,7 @@ async function drumRoll(cueSeconds, tease = false) {
   void fx.offsetWidth;
   beams.forEach((beam) => beam.classList.add('on'));
 
-  const { ms, synthesized, reached } = await sound.drumroll(cueSeconds, { tease });
+  const { ms, synthesized, reached, left } = await sound.drumroll(cueSeconds, { tease });
   const started = performance.now();
   const centre = { x: W * 0.2, y: H * 0.3, w: W * 0.6, h: H * 0.4 };
   const twinkle = setInterval(() => {
@@ -308,6 +309,7 @@ async function drumRoll(cueSeconds, tease = false) {
   setTimeout(() => beams.forEach((beam) => beam.remove()), 600);
   if (synthesized) sound.crash();
   flash('#fff', 0.9, 700);
+  return left ? left() : 0;
 }
 
 // The reveal: the answer slams in huge at the centre of the screen, holds,
@@ -317,7 +319,8 @@ async function bigReveal(row, index, text, settings, withDrumRoll) {
   const span = row.querySelector('.row-text span');
 
   // Lift the row above the dimmer only after the drum roll, so it doesn't give the answer away.
-  if (withDrumRoll) await drumRoll(settings.drumrollCue, !isTop);
+  let musicLeft = 0;
+  if (withDrumRoll) musicLeft = await drumRoll(settings.drumrollCue, !isTop);
   else dim(0.5);
   row.classList.add('lifted');
 
@@ -357,9 +360,15 @@ async function bigReveal(row, index, text, settings, withDrumRoll) {
   const dy = target.y + target.h / 2 - (top + bigH / 2);
   const landing = `translate(${dx}px, ${dy}px) scale(${target.w / bigW}, ${target.h / bigH})`;
 
-  const total = withDrumRoll ? 3300 : 1700;
-  const slam = withDrumRoll ? 0.08 : 0.15; // fraction of the timeline where the text lands at full size
-  const hold = withDrumRoll ? 0.68 : 0.54; // ...and where it starts to shrink
+  // Timeline in ms: slam in, hold at the centre, then shrink into the bar. On the top
+  // answer the hold lasts until the drum-roll track (the beat drop) has finished playing.
+  const base = withDrumRoll ? 3300 : 1700;
+  const slamMs = base * (withDrumRoll ? 0.08 : 0.15);
+  const baseHoldMs = base * (withDrumRoll ? 0.68 : 0.54);
+  const holdMs = Math.max(baseHoldMs, musicLeft);
+  const total = holdMs + (base - baseHoldMs);
+  const slam = slamMs / total; // fraction of the timeline where the text lands at full size
+  const hold = holdMs / total; // ...and where it starts to shrink
   const timing = { duration: total, fill: 'both' };
 
   inner.animate(
@@ -393,8 +402,8 @@ async function bigReveal(row, index, text, settings, withDrumRoll) {
       [
         { transform: 'scale(.3)', opacity: 0, offset: 0 },
         { transform: 'scale(.3)', opacity: 0, offset: slam },
-        { transform: 'scale(1)', opacity: 1, offset: slam + 0.07 },
-        { transform: 'scale(1)', opacity: 1, offset: hold - 0.06 },
+        { transform: 'scale(1)', opacity: 1, offset: slam + 230 / total },
+        { transform: 'scale(1)', opacity: 1, offset: hold - 200 / total },
         { transform: 'scale(.8)', opacity: 0, offset: hold },
         { transform: 'scale(.8)', opacity: 0, offset: 1 },
       ],
@@ -407,15 +416,17 @@ async function bigReveal(row, index, text, settings, withDrumRoll) {
     // On the top answer the drum roll's beat drop is the reveal sound, so no ding over it.
     if (!(isTop && withDrumRoll)) sound.ding();
     burstAt(centre, withDrumRoll ? 190 : 50, { gold: isTop, power: withDrumRoll ? 1.25 : 0.8 });
-  }, total * slam * 0.8);
+  }, slamMs * 0.8);
   if (withDrumRoll) {
-    setTimeout(() => burstAt(centre, 70, { gold: true, power: 0.7 }), total * 0.3);
-    setTimeout(() => burstAt(centre, 70, { gold: true, power: 0.7 }), total * 0.5);
+    // Keep the confetti going for as long as the text holds at the centre.
+    for (let at = base * 0.3; at < holdMs - 300; at += base * 0.2) {
+      setTimeout(() => burstAt(centre, 70, { gold: true, power: 0.7 }), at);
+    }
   }
   setTimeout(() => {
     sound.whoosh();
     dim(0);
-  }, total * hold);
+  }, holdMs);
 
   await flight.finished;
 
