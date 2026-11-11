@@ -1,5 +1,6 @@
 // Sound for the board. Every sound is synthesized with Web Audio unless a matching
 // file exists in /public/audio (drumroll, reveal, strike), in which case the file plays.
+// Files in data/wrong replace the strike sound; one is picked at random each time.
 
 const DEFAULT_ROLL_SECONDS = 3.6;
 
@@ -43,11 +44,15 @@ export class Sound {
     } catch {
       return;
     }
-    for (const [name, url] of Object.entries(manifest)) {
-      if (this.files[name] === url) continue;
+    // A manifest entry is one URL, or a list of URLs to pick from at random.
+    const makeAudio = (url) => {
       const element = new Audio(url);
       element.preload = 'auto';
-      this.elements[name] = element;
+      return element;
+    };
+    for (const [name, url] of Object.entries(manifest)) {
+      if (JSON.stringify(this.files[name]) === JSON.stringify(url)) continue;
+      this.elements[name] = Array.isArray(url) ? url.map(makeAudio) : makeAudio(url);
     }
     for (const name of Object.keys(this.elements)) {
       if (!manifest[name]) delete this.elements[name];
@@ -56,7 +61,14 @@ export class Sound {
   }
 
   playFile(name) {
-    const element = this.elements[name];
+    let element = this.elements[name];
+    if (Array.isArray(element)) {
+      for (const other of element) other.pause();
+      // Random pick, avoiding the same sound twice in a row when there is a choice.
+      const options = element.length > 1 ? element.filter((e) => e !== this.lastPick?.[name]) : element;
+      element = options[Math.floor(Math.random() * options.length)];
+      this.lastPick = { ...this.lastPick, [name]: element };
+    }
     if (!element) return null;
     try {
       element.pause();
@@ -174,8 +186,12 @@ export class Sound {
 
   // Starts the drum roll and resolves with how long to wait before the reveal.
   // cueSeconds > 0 overrides the wait; otherwise the reveal lands when the track ends.
-  async drumroll(cueSeconds = 0) {
-    const element = this.elements.drumroll;
+  // A fake-out (tease) uses tease.* when present: the build-up without the drop,
+  // revealing when it runs out. Otherwise it falls back to the normal roll.
+  async drumroll(cueSeconds = 0, { tease = false } = {}) {
+    const useTease = tease && Boolean(this.elements.tease);
+    const element = useTease ? this.elements.tease : this.elements.drumroll;
+    if (useTease) cueSeconds = 0;
     if (element) {
       try {
         element.pause();
@@ -183,7 +199,7 @@ export class Sound {
         await element.play();
         const length = Number.isFinite(element.duration) && element.duration > 0 ? element.duration : DEFAULT_ROLL_SECONDS;
         const cue = cueSeconds > 0 ? Math.min(cueSeconds, length) : length;
-        return { ms: cue * 1000, synthesized: false };
+        return { ms: cue * 1000, synthesized: false, reached: this.untilPosition(element, cue) };
       } catch {
         // Blocked or broken file: fall through to the built-in roll.
       }
@@ -191,6 +207,21 @@ export class Sound {
     const seconds = cueSeconds > 0 ? cueSeconds : DEFAULT_ROLL_SECONDS;
     if (this.ready) this.synthRoll(seconds);
     return { ms: seconds * 1000, synthesized: true };
+  }
+
+  // Resolves when the track's own playhead reaches `seconds`, so a slow start or a
+  // stutter can't knock the reveal off the beat. Falls back to a timer if the
+  // element stops reporting progress.
+  untilPosition(element, seconds) {
+    const deadline = performance.now() + seconds * 1000 + 1500;
+    return new Promise((resolve) => {
+      const check = () => {
+        const done = element.ended || element.paused || element.currentTime >= seconds || performance.now() > deadline;
+        if (done) resolve();
+        else requestAnimationFrame(check);
+      };
+      check();
+    });
   }
 
   synthRoll(seconds) {

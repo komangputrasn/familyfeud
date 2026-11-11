@@ -159,6 +159,56 @@ main { padding: 20px; max-width: 1400px; margin: 0 auto; }
 #pin-gate input { font-size: 24px; letter-spacing: .3em; text-align: center; }
 .pin-note { color: #fca5a5; font-size: 14px; }
 
+/* "Which group?" picker shown before every reveal or strike */
+#group-pick {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 10, 30, .85);
+}
+#group-pick[hidden] { display: none; }
+.gp-box {
+  width: min(620px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  outline: none;
+}
+.gp-title { font-size: 24px; }
+.gp-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+#group-pick.strike .gp-buttons button { background: var(--red); border-color: var(--red); color: #fff; }
+#group-pick.reveal .gp-buttons button { background: var(--green); border-color: var(--green); color: #052e13; }
+#group-pick kbd {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid currentColor;
+  font: 600 12px/1.4 ui-monospace, monospace;
+  opacity: .7;
+}
+
+/* group scores card */
+.groups-table { display: grid; gap: 8px; }
+.group-line {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card-2);
+}
+.group-line .g-label { font-weight: 800; }
+.group-line .g-stats { color: var(--muted); font-size: 14px; }
+.group-line .g-stats b { color: var(--text); font-size: 18px; }
+
 /* ------------------------------------------------------------ admin: play */
 
 .play {

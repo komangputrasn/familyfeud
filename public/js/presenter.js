@@ -12,6 +12,10 @@ function verdictHtml(judge, round) {
     return `<div class="verdict warn">${guess}<div class="headline">The judge could not answer</div>
       <div class="reason">The operator will decide this one.</div></div>`;
   }
+  if (judge.match === null && judge.offBoard) {
+    return `<div class="verdict match">${guess}<div class="headline">✔ Good answer, not on the board</div>
+      <div class="reason">${h(judge.reason)}</div></div>`;
+  }
   if (judge.match === null) {
     return `<div class="verdict miss">${guess}<div class="headline">✖ Not on the board</div>
       <div class="reason">${h(judge.reason)}</div></div>`;
@@ -59,8 +63,13 @@ function render(state) {
       </div>`;
     })
     .join('');
+  const extras = (round.extras || [])
+    .map((text) => `<div class="p-ans shown"><span class="num">✔</span><span class="txt">${h(text)}</span><span class="chip green">Accepted</span></div>`)
+    .join('');
 
-  const marks = Array.from({ length: settings.maxStrikes }, (_, i) => `<span class="${i < round.strikes ? 'on' : ''}">✖</span>`).join('');
+  const scores = (state.groups || [])
+    .map((g, i) => `<div><b>Group ${i + 1}:</b> ${g.points} pts · ✖ ${g.wrong}</div>`)
+    .join('');
   const left = round.answers.filter((a) => !a.revealed).length;
 
   $('#content').innerHTML = `
@@ -74,9 +83,9 @@ function render(state) {
     ${verdictHtml(judge, round)}
     <div class="card">
       <h2>Answers · ${left} still hidden</h2>
-      ${answers}
+      ${answers}${extras}
     </div>
-    <div class="card p-strikes"><h2 style="margin:0">Strikes</h2><div class="strike-marks">${marks}</div></div>
+    <div class="card p-groups"><h2>Groups</h2>${scores}</div>
     ${nextHtml(next, 'Up next')}`;
 }
 

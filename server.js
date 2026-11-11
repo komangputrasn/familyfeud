@@ -18,9 +18,13 @@ const DATA_DIR = path.join(here, 'data');
 const QUESTIONS_FILE = path.join(DATA_DIR, 'questions.json');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const AUDIO_DIR = path.join(here, 'public', 'audio');
-const AUDIO_NAMES = ['drumroll', 'reveal', 'strike'];
+const WRONG_DIR = path.join(DATA_DIR, 'wrong'); // any audio here plays at random on a strike
+const CORRECT_DIR = path.join(DATA_DIR, 'correct'); // correct.* here plays on every reveal
+const AUDIO_NAMES = ['drumroll', 'tease', 'reveal', 'strike'];
 const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.m4a'];
 const MAX_ANSWERS = 8;
+const GROUP_COUNT = 3;
+const MAX_ROWS = 10; // survey answers plus accepted off-board answers
 
 // ---------------------------------------------------------------- storage
 
@@ -59,9 +63,9 @@ const DEFAULT_SETTINGS = {
   title: 'Survey Showdown',
   subtitle: 'Office Edition',
   topLabel: 'Top Answer',
-  maxStrikes: 3,
   drumrollOnTop: true,
   drumrollCue: 0, // seconds into the drum-roll track at which the reveal fires; 0 = when it ends
+  drumrollTease: 25, // % chance a regular answer also gets the drum roll while the top answer is still hidden
 };
 
 let questions = cleanQuestions(readJson(QUESTIONS_FILE, []));
@@ -70,12 +74,33 @@ const saved = readJson(STATE_FILE, {});
 const state = {
   settings: { ...DEFAULT_SETTINGS, ...(saved.settings || {}) },
   phase: saved.phase === 'round' && saved.round ? 'round' : 'title',
-  round: saved.round || null,
+  round: saved.round ? { extras: [], ...saved.round } : null,
+  groups: cleanGroups(saved.groups), // scores for the whole game, kept across questions
   judge: null, // a verdict from before a restart is stale
 };
 
 function persist() {
-  writeJson(STATE_FILE, { settings: state.settings, phase: state.phase, round: state.round });
+  writeJson(STATE_FILE, { settings: state.settings, phase: state.phase, round: state.round, groups: state.groups });
+}
+
+// ---------------------------------------------------------------- groups
+
+function cleanGroups(input) {
+  return Array.from({ length: GROUP_COUNT }, (_, i) => {
+    const g = Array.isArray(input) ? input[i] : null;
+    const count = (v) => (Number.isFinite(v) && v > 0 ? Math.round(v) : 0);
+    return { points: count(g?.points), wrong: count(g?.wrong) };
+  });
+}
+
+function groupAt(group) {
+  if (!Number.isInteger(group) || group < 0 || group >= GROUP_COUNT) throw new Error('Pick a group first.');
+  return state.groups[group];
+}
+
+// Points by rank: with 6 answers, #1 is worth 6 and #6 is worth 1.
+function pointsFor(round, index) {
+  return round.answers.length - index;
 }
 
 // ---------------------------------------------------------------- views
@@ -95,7 +120,37 @@ function audioManifest() {
     const stamp = Math.round(fs.statSync(path.join(AUDIO_DIR, file)).mtimeMs);
     found[name] = `/audio/${encodeURIComponent(file)}?v=${stamp}`;
   }
+  const wrong = wrongSounds();
+  if (wrong.length) found.strike = wrong;
+  const correct = correctSound();
+  if (correct) found.reveal = correct;
   return found;
+}
+
+// data/correct/correct.* is the "correct answer" sound; it replaces public/audio/reveal.*.
+function correctSound() {
+  for (const ext of AUDIO_EXTENSIONS) {
+    const file = path.join(CORRECT_DIR, `correct${ext}`);
+    if (fs.existsSync(file)) return `/correct/correct${ext}?v=${Math.round(fs.statSync(file).mtimeMs)}`;
+  }
+  return null;
+}
+
+// Every audio file in data/wrong; the board picks one at random for each strike.
+function wrongSounds() {
+  let files = [];
+  try {
+    files = fs.readdirSync(WRONG_DIR);
+  } catch {
+    return [];
+  }
+  return files
+    .filter((file) => AUDIO_EXTENSIONS.includes(path.extname(file).toLowerCase()))
+    .sort()
+    .map((file) => {
+      const stamp = Math.round(fs.statSync(path.join(WRONG_DIR, file)).mtimeMs);
+      return `/wrong/${encodeURIComponent(file)}?v=${stamp}`;
+    });
 }
 
 function lanUrls() {
@@ -114,17 +169,19 @@ function currentIndex() {
 
 // The board is open to anyone on the network, so it never receives hidden answers.
 function viewFor(role) {
-  const { settings, phase, round } = state;
+  const { settings, phase, round, groups } = state;
   if (role === 'board') {
     return {
       settings,
       phase,
+      groups,
       round: round && {
         runId: round.runId,
         question: round.questionVisible ? round.question : '',
         questionVisible: round.questionVisible,
         strikes: round.strikes,
         answers: round.answers.map((a) => (a.revealed ? { revealed: true, text: a.text } : { revealed: false })),
+        extras: round.extras,
       },
     };
   }
@@ -133,6 +190,7 @@ function viewFor(role) {
     settings,
     phase,
     round,
+    groups,
     judge: state.judge,
     position: { index, total: questions.length },
     next: questions[index + 1] || null,
@@ -199,6 +257,7 @@ function startRound(question) {
     question: question.question,
     answers: question.answers.slice(0, MAX_ANSWERS).map((text) => ({ text, revealed: false })),
     strikes: 0,
+    extras: [], // accepted good answers that weren't on the survey board
     questionVisible: true,
   };
   state.phase = 'round';
@@ -242,22 +301,40 @@ const actions = {
     requireRound().questionVisible = Boolean(visible);
   },
 
-  reveal({ index, mode }) {
+  // group: who guessed it (0-2), or null to reveal without points (e.g. answers nobody got).
+  reveal({ index, mode, group = null }) {
     const round = requireRound();
     const answer = answerAt(round, index);
     if (answer.revealed) return;
+    const scorer = group === null ? null : groupAt(group);
     let resolved = mode;
     if (!['normal', 'drum', 'quiet'].includes(resolved)) {
-      resolved = index === 0 && state.settings.drumrollOnTop ? 'drum' : 'normal';
+      const { drumrollOnTop, drumrollTease } = state.settings;
+      const fakeOut = index !== 0 && !round.answers[0].revealed && Math.random() * 100 < drumrollTease;
+      resolved = (index === 0 && drumrollOnTop) || fakeOut ? 'drum' : 'normal';
     }
     answer.revealed = true;
+    answer.by = null;
+    answer.points = 0;
+    if (scorer) {
+      answer.by = group;
+      answer.points = pointsFor(round, index);
+      scorer.points += answer.points;
+    }
     state.phase = 'round';
     state.judge = null;
-    return { kind: 'reveal', index, mode: resolved };
+    return { kind: 'reveal', index, mode: resolved, group: answer.by, points: answer.points };
   },
 
+  // Hiding an answer takes its points back from the group that got them.
   hide({ index }) {
-    answerAt(requireRound(), index).revealed = false;
+    const answer = answerAt(requireRound(), index);
+    if (answer.revealed && Number.isInteger(answer.by) && state.groups[answer.by]) {
+      state.groups[answer.by].points = Math.max(0, state.groups[answer.by].points - (answer.points || 0));
+    }
+    answer.revealed = false;
+    answer.by = null;
+    answer.points = 0;
   },
 
   revealAll() {
@@ -275,22 +352,32 @@ const actions = {
     return { kind: 'revealAll', indices };
   },
 
-  strike() {
+  // Wrong answers are counted per group for the whole game, with no limit.
+  strike({ group }) {
     const round = requireRound();
-    if (round.strikes >= state.settings.maxStrikes) throw new Error('All strikes are already used.');
+    const target = groupAt(group);
+    target.wrong += 1;
     round.strikes += 1;
     state.phase = 'round';
     state.judge = null;
-    return { kind: 'strike', count: round.strikes };
+    return { kind: 'strike', group, count: target.wrong };
   },
 
-  unstrike() {
-    const round = requireRound();
-    round.strikes = Math.max(0, round.strikes - 1);
+  unstrike({ group }) {
+    const target = groupAt(group);
+    target.wrong = Math.max(0, target.wrong - 1);
+    if (state.round) state.round.strikes = Math.max(0, state.round.strikes - 1);
   },
 
-  clearStrikes() {
-    requireRound().strikes = 0;
+  resetScores() {
+    state.groups = cleanGroups([]);
+    if (state.round) {
+      state.round.strikes = 0;
+      for (const answer of state.round.answers) {
+        answer.by = null;
+        answer.points = 0;
+      }
+    }
   },
 
   judge({ guess }) {
@@ -301,6 +388,28 @@ const actions = {
 
   clearJudge() {
     state.judge = null;
+  },
+
+  // A good answer that isn't on the board: no strike, nothing revealed, the board just cheers it.
+  // The guess also gets its own row under the survey answers (no points), while there is room.
+  acceptOffBoard() {
+    const round = requireRound();
+    const judge = state.judge;
+    if (!judge || judge.status !== 'done') throw new Error('There is no verdict to accept.');
+    const text = judge.guess;
+    const already = round.extras.some((t) => t.toLowerCase() === text.toLowerCase());
+    const room = round.answers.length + round.extras.length < MAX_ROWS;
+    const added = !already && room;
+    if (added) round.extras.push(text);
+    state.phase = 'round';
+    state.judge = null;
+    return { kind: 'accepted', text, added };
+  },
+
+  removeExtra({ index }) {
+    const round = requireRound();
+    if (!round.extras[index]) throw new Error('That answer is not on the board.');
+    round.extras.splice(index, 1);
   },
 
   saveQuestions({ questions: incoming }) {
@@ -323,11 +432,10 @@ const actions = {
       title: text(s.title, current.title, 60) || DEFAULT_SETTINGS.title,
       subtitle: text(s.subtitle, current.subtitle, 60),
       topLabel: text(s.topLabel, current.topLabel, 30),
-      maxStrikes: Math.round(number(s.maxStrikes, current.maxStrikes, 1, 5)),
       drumrollOnTop: typeof s.drumrollOnTop === 'boolean' ? s.drumrollOnTop : current.drumrollOnTop,
       drumrollCue: number(s.drumrollCue, current.drumrollCue, 0, 120),
+      drumrollTease: Math.round(number(s.drumrollTease, current.drumrollTease, 0, 100)),
     };
-    if (state.round) state.round.strikes = Math.min(state.round.strikes, state.settings.maxStrikes);
   },
 
   testSound({ name }) {
@@ -346,6 +454,8 @@ const actions = {
 
 const app = express();
 app.get('/api/audio', (req, res) => res.json(audioManifest()));
+app.use('/wrong', express.static(WRONG_DIR, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
+app.use('/correct', express.static(CORRECT_DIR, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 app.use(
   express.static(path.join(here, 'public'), {
     extensions: ['html'],

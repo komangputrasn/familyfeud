@@ -232,11 +232,10 @@ html, body {
 
 .qpanel {
   position: absolute;
-  left: 50%;
+  left: 120px;
   top: 56px;
-  width: 1380px;
+  width: 1680px;
   height: 200px;
-  margin-left: -690px;
   padding: 16px 60px;
   display: grid;
   place-items: center;
@@ -303,13 +302,13 @@ html, body {
 
 /* ------------------------------------------------------------ answer rows */
 
+/* Layout under the question: answers on the left, groups in a column on the right. */
 #rows {
   position: absolute;
-  left: 50%;
-  top: 288px;
+  left: 120px;
+  top: 280px;
   width: 1200px;
-  height: 640px;
-  margin-left: -600px;
+  height: 760px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -411,6 +410,26 @@ html, body {
     inset 0 -8px 16px rgba(200, 110, 0, .4);
 }
 
+/* accepted good answer that wasn't on the survey: green, ✔ instead of a number */
+.row.extra .badge {
+  border-color: #d4ffe0;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 60, 20, .6);
+  background: radial-gradient(circle at 35% 28%, #c9ffd8 0%, #4ade80 35%, #16a34a 70%, #0b6b2e 100%);
+  box-shadow: 0 0 0 2px #0b4d22, 0 3px 8px rgba(0, 0, 0, .45), inset 0 -4px 8px rgba(0, 70, 20, .5);
+}
+.row.revealed.extra .bar {
+  border-color: #eafff0;
+  background: linear-gradient(180deg, #f2fff5 0%, #c8f7d6 45%, #8fe7aa 55%, #5fcf84 100%);
+  box-shadow:
+    0 0 0 2px #0b6b2e,
+    0 0 26px rgba(120, 240, 160, .6),
+    0 10px 22px rgba(0, 8, 60, .5),
+    inset 0 2px 0 #fff,
+    inset 0 -8px 16px rgba(20, 140, 60, .35);
+}
+.row.extra .row-text span { color: #053d1a; }
+
 .row-text {
   position: absolute;
   top: 0;
@@ -435,18 +454,10 @@ html, body {
 .row.revealed .row-text span { opacity: 1; }
 .row.revealing .row-text span { opacity: 0; }
 
-/* drum-roll anticipation */
-.row.spot { animation: shake .09s linear infinite; }
+/* drum-roll anticipation: the row stays still and glows, no shaking */
 .row.spot .bar {
   border-color: #fff3b0;
   animation: spot-glow .42s ease-in-out infinite alternate;
-}
-@keyframes shake {
-  0% { transform: translate(0, 0); }
-  25% { transform: translate(var(--amp, 2px), calc(var(--amp, 2px) * -.6)); }
-  50% { transform: translate(calc(var(--amp, 2px) * -1), calc(var(--amp, 2px) * .5)); }
-  75% { transform: translate(calc(var(--amp, 2px) * .6), var(--amp, 2px)); }
-  100% { transform: translate(0, 0); }
 }
 @keyframes spot-glow {
   from { box-shadow: 0 0 0 2px #8a4b00, 0 0 24px rgba(255, 215, 100, .55), inset 0 2px 0 rgba(255, 255, 255, .7), inset 0 -8px 16px rgba(0, 18, 100, .55); }
@@ -463,32 +474,48 @@ html, body {
   transition: opacity .35s ease;
 }
 
-/* ------------------------------------------------------------ strikes */
+/* ------------------------------------------------------------ groups: points and wrong answers */
 
-#strikes {
+#groups {
   position: absolute;
-  right: 110px;
-  bottom: 30px;
+  left: 1360px;
+  top: 280px;
+  width: 440px;
+  height: 760px;
   display: flex;
-  gap: 20px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 34px;
 }
-.slot {
-  position: relative;
-  width: 104px;
-  height: 104px;
-  border-radius: 26px;
-  border: 3px solid rgba(175, 215, 255, .5);
-  background: linear-gradient(180deg, rgba(8, 36, 140, .6), rgba(3, 18, 86, .75));
+.g-group { display: grid; grid-template-rows: 118px 80px; gap: 10px; }
+.g-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border-radius: 22px;
+  border: 3px solid rgba(175, 215, 255, .55);
+  background: linear-gradient(180deg, rgba(8, 36, 140, .72), rgba(3, 18, 86, .85));
   box-shadow: inset 0 4px 12px rgba(0, 0, 40, .65), 0 2px 0 rgba(255, 255, 255, .16);
+  color: #fff;
+  white-space: nowrap;
+  text-shadow: 0 2px 0 #062a8a;
 }
-.slot .x {
+.g-name { font: 800 38px/1 var(--display); letter-spacing: .03em; text-transform: uppercase; color: #cfe6ff; }
+.g-num { font: 900 64px/1 var(--display); font-variant-numeric: tabular-nums; }
+.g-points.scored { border-color: #ffe476; box-shadow: 0 0 34px rgba(255, 205, 70, .75), inset 0 4px 12px rgba(0, 0, 40, .5); }
+.g-wrong { border-color: rgba(255, 170, 160, .5); }
+.g-wrong .g-name { font-size: 30px; }
+.g-wrong .g-num { font-size: 48px; color: #ffd2cc; }
+.g-x { width: 46px; height: 46px; display: block; }
+.g-plus {
   position: absolute;
-  inset: 9px;
-  opacity: 0;
+  font: 900 64px/1 var(--display);
+  color: #ffe476;
+  text-shadow: 0 3px 0 #8a4300, 0 0 20px rgba(255, 205, 70, .9);
+  pointer-events: none;
 }
-.slot.on { border-color: rgba(255, 190, 180, .9); }
-.slot.on .x { opacity: 1; }
-.x svg, .bigx svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.g-x svg, .bigx svg { display: block; width: 100%; height: 100%; overflow: visible; }
 
 .bigx {
   position: absolute;
@@ -532,6 +559,17 @@ html, body {
   color: var(--navy);
 }
 .fly.gold .fly-cool { color: #4a2400; }
+
+/* a good answer that isn't on the board */
+.fly.accepted { text-align: center; }
+.accepted-note {
+  margin-top: 22px;
+  font: 800 44px/1 var(--display);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #ffe476;
+  text-shadow: 0 3px 0 #0b2f9c, 0 0 18px rgba(255, 205, 70, .8);
+}
 
 .toplabel {
   position: absolute;

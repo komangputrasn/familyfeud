@@ -28,6 +28,8 @@ function toast(message, ok = false) {
   toastTimer = setTimeout(() => (node.hidden = true), 4500);
 }
 
+const MAX_ROWS = 10; // matches the server: survey answers plus accepted off-board answers
+
 function roundInProgress() {
   const round = state?.round;
   if (!round) return false;
@@ -61,12 +63,11 @@ function renderRound() {
 }
 
 function verdictHtml() {
-  const { judge, round, settings } = state;
+  const { judge, round } = state;
   if (!judge || !round) return '';
   const guess = `<div class="guess">Contestant said: “${h(judge.guess)}”</div>`;
-  const outOfStrikes = round.strikes >= settings.maxStrikes;
   const strikeButton = (extra, label, primary = false) =>
-    `<button type="button" class="stop ${extra}" ${primary ? 'data-primary' : ''} data-act="strike" ${outOfStrikes ? 'disabled' : ''}>${label}</button>`;
+    `<button type="button" class="stop ${extra}" ${primary ? 'data-primary' : ''} data-act="strike">${label}</button>`;
   const dismiss = (primary = false) =>
     `<button type="button" data-act="clearJudge" ${primary ? 'data-primary' : ''}>Dismiss</button>`;
 
@@ -90,6 +91,22 @@ function verdictHtml() {
   }
 
   const confidence = `<span class="chip">${h(judge.confidence)} confidence</span>`;
+
+  if (judge.match === null && judge.offBoard) {
+    const extras = round.extras || [];
+    const already = extras.some((t) => t.toLowerCase() === judge.guess.toLowerCase());
+    const room = round.answers.length + extras.length < MAX_ROWS;
+    const label = already ? 'Accept ✔ (already on the board)' : room ? 'Accept ✔ and add to the board' : 'Accept ✔ (board is full, not added)';
+    return `<div class="verdict match">${guess}
+      <div class="headline">✔ Good answer, not on the board</div>
+      <div class="reason">${h(judge.reason)} ${confidence} · no strike, no points</div>
+      <div class="row-line">
+        <button type="button" class="go big" data-primary data-act="acceptOffBoard">${label}</button>
+        ${strikeButton('', 'Strike instead')}
+        ${dismiss()}
+      </div>
+    </div>`;
+  }
 
   if (judge.match === null) {
     return `<div class="verdict miss">${guess}
@@ -155,42 +172,128 @@ function renderAnswers() {
     .map((answer, i) => {
       const suggested = judge?.status === 'done' && judge.match === i;
       const drum = drumByDefault(i);
+      const owner = Number.isInteger(answer.by) ? `Group ${answer.by + 1} +${answer.points}` : 'No points';
       const buttons = answer.revealed
-        ? `<span class="chip green">On the board</span>
+        ? `<span class="chip green">On the board · ${owner}</span>
            <button type="button" class="small" data-act="hide" data-i="${i}">Hide again</button>`
         : `<button type="button" class="small go" data-act="reveal" data-i="${i}" data-mode="auto">Reveal${drum ? ' + drum roll' : ''}</button>
            <button type="button" class="small ${drum ? '' : 'drum'}" data-act="reveal" data-i="${i}" data-mode="${drum ? 'normal' : 'drum'}">${drum ? 'No drum roll' : 'Drum roll'}</button>
            <button type="button" class="small" data-act="reveal" data-i="${i}" data-mode="quiet" title="Flip it open with no fanfare">Quiet</button>`;
       return `<div class="ans ${answer.revealed ? 'shown' : ''} ${suggested ? 'suggested' : ''}">
         <span class="num">${i + 1}</span>
-        <span class="txt">${h(answer.text)} ${i === 0 ? '<span class="chip gold">Top answer</span>' : ''}</span>
+        <span class="txt">${h(answer.text)} ${i === 0 ? '<span class="chip gold">Top answer</span>' : ''} <span class="chip">${round.answers.length - i} pts</span></span>
         <span class="btns">${buttons}</span>
       </div>`;
     })
     .join('');
+  const extras = (round.extras || [])
+    .map(
+      (text, i) => `<div class="ans shown">
+        <span class="num">✔</span>
+        <span class="txt">${h(text)} <span class="chip green">Accepted, not on the survey · no points</span></span>
+        <span class="btns"><button type="button" class="small" data-act="removeExtra" data-i="${i}">Remove</button></span>
+      </div>`,
+    )
+    .join('');
   const anyHidden = round.answers.some((a) => !a.revealed);
   setHtml(
     $('#answers'),
-    `${rows}<div class="row-line" style="margin-top:12px">
+    `${rows}${extras}<div class="row-line" style="margin-top:12px">
       <button type="button" data-act="revealAll" ${anyHidden ? '' : 'disabled'}>Reveal all remaining answers</button>
     </div>`,
   );
 }
 
-function renderStrikes() {
-  const { round, settings } = state;
-  const strikes = round?.strikes ?? 0;
-  const marks = Array.from({ length: settings.maxStrikes }, (_, i) => `<span class="${i < strikes ? 'on' : ''}">✖</span>`).join('');
+function renderGroups() {
+  const { round, groups } = state;
+  const lines = groups
+    .map(
+      (g, i) => `<div class="group-line">
+        <div>
+          <div class="g-label">Group ${i + 1}</div>
+          <div class="g-stats"><b>${g.points}</b> points · <b>${g.wrong}</b> ✖</div>
+        </div>
+        <button type="button" class="small stop" data-act="strike" data-g="${i}" ${round ? '' : 'disabled'} title="Strike Group ${i + 1}">✖</button>
+        <button type="button" class="small" data-act="unstrike" data-g="${i}" ${g.wrong ? '' : 'disabled'}>Undo ✖</button>
+      </div>`,
+    )
+    .join('');
+  const any = groups.some((g) => g.points || g.wrong);
   setHtml(
     $('#strike-card'),
-    `<h2>Strikes</h2>
-     <div class="row-line"><div class="strike-marks">${marks}</div></div>
-     <div class="row-line">
-       <button type="button" class="stop" data-act="strike" ${!round || strikes >= settings.maxStrikes ? 'disabled' : ''}>Strike ✖</button>
-       <button type="button" data-act="unstrike" ${strikes ? '' : 'disabled'}>Undo</button>
-       <button type="button" data-act="clearStrikes" ${strikes ? '' : 'disabled'}>Clear</button>
+    `<h2>Groups · whole game</h2>
+     <div class="groups-table">${lines}</div>
+     <div class="row-line" style="margin-top:12px">
+       <button type="button" class="small" data-act="resetScores" ${any ? '' : 'disabled'}>Reset scores</button>
      </div>`,
   );
+}
+
+// ------------------------------------------------------------ "which group?" picker
+
+const picker = $('#group-pick');
+let pickResolve = null;
+let pickAllowsNone = false;
+
+// Resolves with a group index, null for "no group" (reveals only), or undefined if cancelled.
+function pickGroup({ kind, title, note = '', allowNone = false }) {
+  pickResolve?.(undefined);
+  pickAllowsNone = allowNone;
+  picker.className = kind;
+  picker.querySelector('.gp-title').textContent = title;
+  picker.querySelector('.gp-note').textContent = note;
+  picker.querySelector('.gp-none').hidden = !allowNone;
+  picker.hidden = false;
+  picker.querySelector('.gp-box').focus();
+  return new Promise((resolve) => (pickResolve = resolve));
+}
+
+function closePick(value) {
+  picker.hidden = true;
+  const resolve = pickResolve;
+  pickResolve = null;
+  resolve?.(value);
+}
+
+picker.addEventListener('click', (e) => {
+  if (e.target === picker) return closePick(undefined);
+  const button = e.target.closest('[data-g]');
+  if (!button) return;
+  const g = button.dataset.g;
+  closePick(g === 'cancel' ? undefined : g === 'none' ? null : Number(g));
+});
+
+document.addEventListener(
+  'keydown',
+  (e) => {
+    if (picker.hidden) return;
+    if (['1', '2', '3'].includes(e.key)) closePick(Number(e.key) - 1);
+    else if (e.key === '0' && pickAllowsNone) closePick(null);
+    else if (e.key === 'Escape') closePick(undefined);
+    else if (e.key !== 'Tab') return;
+    if (e.key !== 'Tab') e.preventDefault();
+  },
+  true,
+);
+
+async function revealWithGroup(index, mode) {
+  const answer = state.round?.answers[index];
+  if (!answer) return;
+  const points = state.round.answers.length - index;
+  const group = await pickGroup({
+    kind: 'reveal',
+    title: `Which group got #${index + 1} “${answer.text}”?`,
+    note: `Worth ${points} point${points === 1 ? '' : 's'}.`,
+    allowNone: true,
+  });
+  if (group === undefined) return;
+  net.send('reveal', { index, mode, group });
+}
+
+async function strikeWithGroup(given) {
+  const group = Number.isInteger(given) ? given : await pickGroup({ kind: 'strike', title: 'Which group gave the wrong answer?' });
+  if (!Number.isInteger(group)) return;
+  net.send('strike', { group });
 }
 
 function renderScreen() {
@@ -368,15 +471,15 @@ function syncSettings() {
     fields.title.value = s.title;
     fields.subtitle.value = s.subtitle;
     fields.topLabel.value = s.topLabel;
-    fields.maxStrikes.value = s.maxStrikes;
     fields.drumrollOnTop.checked = s.drumrollOnTop;
     fields.drumrollCue.value = s.drumrollCue;
+    fields.drumrollTease.value = s.drumrollTease;
   }
 
   const { info } = state;
   const audioRow = (name, label) =>
-    `<dt>${label}</dt><dd>${info.audio[name] ? `your file (${h(decodeURIComponent(info.audio[name].split('/').pop().split('?')[0]))})` : 'built-in sound'}</dd>`;
-  setHtml($('#audio-info'), audioRow('drumroll', 'Drum roll') + audioRow('reveal', 'Reveal') + audioRow('strike', 'Strike'));
+    `<dt>${label}</dt><dd>${Array.isArray(info.audio[name]) ? `${info.audio[name].length} random sounds from data/wrong` : info.audio[name] ?`your file (${h(decodeURIComponent(info.audio[name].split('/').pop().split('?')[0]))})` : 'built-in sound'}</dd>`;
+  setHtml($('#audio-info'), audioRow('drumroll', 'Drum roll') + audioRow('tease', 'Fake-out roll') + audioRow('reveal', 'Reveal') + audioRow('strike', 'Strike'));
 
   const hosts = info.urls.length ? info.urls : [location.origin];
   setHtml(
@@ -399,9 +502,9 @@ settingsForm.addEventListener('submit', (e) => {
       title: fields.title.value,
       subtitle: fields.subtitle.value,
       topLabel: fields.topLabel.value,
-      maxStrikes: Number(fields.maxStrikes.value),
       drumrollOnTop: fields.drumrollOnTop.checked,
       drumrollCue: Number(fields.drumrollCue.value) || 0,
+      drumrollTease: Number(fields.drumrollTease.value) || 0,
     },
   });
   toast('Settings saved.', true);
@@ -413,7 +516,7 @@ function render() {
   renderRound();
   renderVerdict();
   renderAnswers();
-  renderStrikes();
+  renderGroups();
   renderScreen();
   syncEditor();
   syncSettings();
@@ -453,12 +556,16 @@ const handlers = {
     net.send('nextRound');
   },
   toggleQuestion: () => net.send('setQuestionVisible', { visible: !state.round.questionVisible }),
-  reveal: (button) => net.send('reveal', { index: Number(button.dataset.i), mode: button.dataset.mode }),
+  reveal: (button) => revealWithGroup(Number(button.dataset.i), button.dataset.mode),
   hide: (button) => net.send('hide', { index: Number(button.dataset.i) }),
   revealAll: () => net.send('revealAll'),
-  strike: () => net.send('strike'),
-  unstrike: () => net.send('unstrike'),
-  clearStrikes: () => net.send('clearStrikes'),
+  acceptOffBoard: () => net.send('acceptOffBoard'),
+  removeExtra: (button) => net.send('removeExtra', { index: Number(button.dataset.i) }),
+  strike: (button) => strikeWithGroup(button.dataset.g === undefined ? null : Number(button.dataset.g)),
+  unstrike: (button) => net.send('unstrike', { group: Number(button.dataset.g) }),
+  resetScores() {
+    if (confirm('Set every group back to 0 points and 0 wrong answers?')) net.send('resetScores');
+  },
   clearJudge: () => net.send('clearJudge'),
   retryJudge: () => net.send('judge', { guess: state.judge.guess }),
   testSound: (button) => net.send('testSound', { name: button.dataset.name }),
