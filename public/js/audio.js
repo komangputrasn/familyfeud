@@ -186,12 +186,12 @@ export class Sound {
 
   // Starts the drum roll and resolves with how long to wait before the reveal.
   // cueSeconds > 0 overrides the wait; otherwise the reveal lands when the track ends.
-  // A fake-out (tease) uses tease.* when present: the build-up without the drop,
-  // revealing when it runs out. Otherwise it falls back to the normal roll.
+  // The real roll keeps playing past the cue, so the beat drop lands as the answer appears.
+  // A fake-out (tease) uses tease.* when present, otherwise the normal roll, and stops
+  // at the same cue: it lasts just as long as the real roll but never plays the drop.
   async drumroll(cueSeconds = 0, { tease = false } = {}) {
     const useTease = tease && Boolean(this.elements.tease);
     const element = useTease ? this.elements.tease : this.elements.drumroll;
-    if (useTease) cueSeconds = 0;
     if (element) {
       try {
         element.pause();
@@ -199,7 +199,10 @@ export class Sound {
         await element.play();
         const length = Number.isFinite(element.duration) && element.duration > 0 ? element.duration : DEFAULT_ROLL_SECONDS;
         const cue = cueSeconds > 0 ? Math.min(cueSeconds, length) : length;
-        return { ms: cue * 1000, synthesized: false, reached: this.untilPosition(element, cue) };
+        const reached = this.untilPosition(element, cue).then(() => {
+          if (tease) element.pause();
+        });
+        return { ms: cue * 1000, synthesized: false, reached };
       } catch {
         // Blocked or broken file: fall through to the built-in roll.
       }

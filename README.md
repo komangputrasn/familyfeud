@@ -58,13 +58,13 @@ Put files in `public/audio/` with these names (`.mp3`, `.wav`, `.ogg` or `.m4a`)
 | File | Plays |
 |---|---|
 | `drumroll.mp3` | Before the top answer is revealed |
-| `tease.mp3` | Fake-out drum roll on a regular answer; the answer appears when it ends (optional, falls back to the drum roll) |
+| `tease.mp3` | Fake-out drum roll on a regular answer; stops at the same **Reveal at** time as the real one (optional, falls back to the drum roll) |
 | `reveal.mp3` | When an answer is revealed (optional) |
 | `strike.mp3` | On a wrong answer (optional) |
 
 For variety on strikes, drop any number of audio files (any names) into `data/wrong/`. Each strike then plays one of them at random, never the same one twice in a row, and `strike.mp3` is ignored.
 
-Anything missing uses a built-in synthesized sound. The top answer appears when the drum roll track ends. If the big hit in your track comes earlier, set **Reveal at** in Admin > Settings to that time in seconds. Admin > Settings also has a sound check.
+Anything missing uses a built-in synthesized sound. The top answer appears when the drum roll track ends. To reveal earlier, set **Reveal at** in Admin > Settings to a time in seconds: the answer appears there. Set it just before the beat drop: on the top answer the track plays on so the drop lands with the reveal, while a fake-out roll stops there and never plays the drop. Admin > Settings also has a sound check.
 
 ## Settings in `.env`
 

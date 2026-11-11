@@ -37,6 +37,10 @@ function roundInProgress() {
   return revealed < round.answers.length && (revealed > 0 || round.strikes > 0);
 }
 
+function strikesUsedUp() {
+  return Boolean(state.round) && state.round.strikes >= state.maxStrikes;
+}
+
 function drumByDefault(index) {
   return index === 0 && state.settings.drumrollOnTop;
 }
@@ -50,11 +54,28 @@ function renderRound() {
     return;
   }
   const where = position.index >= 0 ? `Question ${position.index + 1} of ${position.total}` : 'Question';
+  const { maxStrikes } = state;
+  const marks = '✖'.repeat(Math.min(round.strikes, maxStrikes)) + '·'.repeat(Math.max(0, maxStrikes - round.strikes));
+  const limit = strikesUsedUp()
+    ? `<div class="verdict miss">
+         <div class="headline">✖ ${maxStrikes} wrong answers: this question is over</div>
+         <div class="row-line">
+           ${
+             state.next
+               ? '<button type="button" class="primary big" data-act="nextNow">Next question ▶</button>'
+               : '<span class="chip gold">That was the last question</span>'
+           }
+           ${round.answers.some((a) => !a.revealed) ? '<button type="button" data-act="revealAll">Reveal all remaining answers first</button>' : ''}
+         </div>
+       </div>`
+    : '';
   setHtml(
     $('#round-card'),
     `<h2>On the board now · ${where}</h2>
      <div class="now-question">${h(round.question)}</div>
+     ${limit}
      <div class="row-line">
+       <span class="chip ${strikesUsedUp() ? 'red' : ''}">Wrong answers ${marks} ${Math.min(round.strikes, maxStrikes)}/${maxStrikes}</span>
        <button type="button" class="small" data-act="toggleQuestion">${round.questionVisible ? 'Hide the question on the board' : 'Show the question on the board'}</button>
        ${round.questionVisible ? '' : '<span class="chip gold">Question is hidden on the board</span>'}
        ${state.phase === 'title' ? '<span class="chip gold">Title screen is showing</span>' : ''}
@@ -66,8 +87,9 @@ function verdictHtml() {
   const { judge, round } = state;
   if (!judge || !round) return '';
   const guess = `<div class="guess">Contestant said: “${h(judge.guess)}”</div>`;
+  const out = strikesUsedUp();
   const strikeButton = (extra, label, primary = false) =>
-    `<button type="button" class="stop ${extra}" ${primary ? 'data-primary' : ''} data-act="strike">${label}</button>`;
+    `<button type="button" class="stop ${extra}" ${primary && !out ? 'data-primary' : ''} data-act="strike" ${out ? `disabled title="${state.maxStrikes} wrong answers already"` : ''}>${label}</button>`;
   const dismiss = (primary = false) =>
     `<button type="button" data-act="clearJudge" ${primary ? 'data-primary' : ''}>Dismiss</button>`;
 
@@ -114,7 +136,7 @@ function verdictHtml() {
       <div class="reason">${h(judge.reason)} ${confidence}</div>
       <div class="row-line">
         ${strikeButton('big', 'Strike ✖', true)}
-        ${dismiss()}
+        ${dismiss(out)}
       </div>
     </div>`;
   }
@@ -213,7 +235,7 @@ function renderGroups() {
           <div class="g-label">Group ${i + 1}</div>
           <div class="g-stats"><b>${g.points}</b> points · <b>${g.wrong}</b> ✖</div>
         </div>
-        <button type="button" class="small stop" data-act="strike" data-g="${i}" ${round ? '' : 'disabled'} title="Strike Group ${i + 1}">✖</button>
+        <button type="button" class="small stop" data-act="strike" data-g="${i}" ${round && !strikesUsedUp() ? '' : 'disabled'} title="Strike Group ${i + 1}">✖</button>
         <button type="button" class="small" data-act="unstrike" data-g="${i}" ${g.wrong ? '' : 'disabled'}>Undo ✖</button>
       </div>`,
     )
@@ -555,6 +577,8 @@ const handlers = {
     if (roundInProgress() && !confirm('Move to the next question? The current board will be cleared.')) return;
     net.send('nextRound');
   },
+  // Shown once the question has used up its wrong answers, so no confirmation is needed.
+  nextNow: () => net.send('nextRound'),
   toggleQuestion: () => net.send('setQuestionVisible', { visible: !state.round.questionVisible }),
   reveal: (button) => revealWithGroup(Number(button.dataset.i), button.dataset.mode),
   hide: (button) => net.send('hide', { index: Number(button.dataset.i) }),

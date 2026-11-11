@@ -454,16 +454,6 @@ html, body {
 .row.revealed .row-text span { opacity: 1; }
 .row.revealing .row-text span { opacity: 0; }
 
-/* drum-roll anticipation: the row stays still and glows, no shaking */
-.row.spot .bar {
-  border-color: #fff3b0;
-  animation: spot-glow .42s ease-in-out infinite alternate;
-}
-@keyframes spot-glow {
-  from { box-shadow: 0 0 0 2px #8a4b00, 0 0 24px rgba(255, 215, 100, .55), inset 0 2px 0 rgba(255, 255, 255, .7), inset 0 -8px 16px rgba(0, 18, 100, .55); }
-  to { box-shadow: 0 0 0 2px #8a4b00, 0 0 90px rgba(255, 225, 120, 1), inset 0 2px 0 rgba(255, 255, 255, .7), inset 0 -8px 16px rgba(0, 18, 100, .55); }
-}
-
 #dim {
   position: absolute;
   inset: -1200px;

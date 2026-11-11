@@ -20,7 +20,8 @@ const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const AUDIO_DIR = path.join(here, 'public', 'audio');
 const WRONG_DIR = path.join(DATA_DIR, 'wrong'); // any audio here plays at random on a strike
 const CORRECT_DIR = path.join(DATA_DIR, 'correct'); // correct.* here plays on every reveal
-const AUDIO_NAMES = ['drumroll', 'tease', 'reveal', 'strike'];
+const MAX_STRIKES = 3; // wrong answers allowed per question
+const AUDIO_NAMES =['drumroll', 'tease', 'reveal', 'strike'];
 const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.m4a'];
 const MAX_ANSWERS = 8;
 const GROUP_COUNT = 3;
@@ -64,7 +65,7 @@ const DEFAULT_SETTINGS = {
   subtitle: 'Office Edition',
   topLabel: 'Top Answer',
   drumrollOnTop: true,
-  drumrollCue: 0, // seconds into the drum-roll track at which the reveal fires; 0 = when it ends
+  drumrollCue: 3.26, // seconds into the drum-roll track at which the reveal fires (just before drumroll.wav's beat drop); 0 = when it ends
   drumrollTease: 25, // % chance a regular answer also gets the drum roll while the top answer is still hidden
 };
 
@@ -192,6 +193,7 @@ function viewFor(role) {
     round,
     groups,
     judge: state.judge,
+    maxStrikes: MAX_STRIKES,
     position: { index, total: questions.length },
     next: questions[index + 1] || null,
   };
@@ -352,9 +354,10 @@ const actions = {
     return { kind: 'revealAll', indices };
   },
 
-  // Wrong answers are counted per group for the whole game, with no limit.
+  // Wrong answers are counted per group for the whole game, and per question up to MAX_STRIKES.
   strike({ group }) {
     const round = requireRound();
+    if (round.strikes >= MAX_STRIKES) throw new Error(`This question already has ${MAX_STRIKES} wrong answers. Move on to the next one.`);
     const target = groupAt(group);
     target.wrong += 1;
     round.strikes += 1;

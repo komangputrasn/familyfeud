@@ -285,25 +285,25 @@ async function quietReveal(row, text) {
   await bar.animate([{ transform: 'rotateX(-90deg)' }, { transform: 'rotateX(0deg)' }], { duration: 240, easing: 'ease-out' }).finished;
 }
 
-// Spotlights the (still) row and sweeps the beams while the drum roll plays.
-async function drumRoll(row, cueSeconds, tease = false) {
+// Dims the whole board and sweeps the beams while the drum roll plays. No row is
+// singled out, so the audience can't tell which answer is about to appear.
+async function drumRoll(cueSeconds, tease = false) {
   const beams = [el('div', 'beam l'), el('div', 'beam r')];
   fx.append(...beams);
   dim(0.82);
-  row.classList.add('spot');
-  void row.offsetWidth;
+  void fx.offsetWidth;
   beams.forEach((beam) => beam.classList.add('on'));
 
   const { ms, synthesized, reached } = await sound.drumroll(cueSeconds, { tease });
   const started = performance.now();
+  const centre = { x: W * 0.2, y: H * 0.3, w: W * 0.6, h: H * 0.4 };
   const twinkle = setInterval(() => {
     const progress = Math.min(1, (performance.now() - started) / ms);
-    burstAt(rel(row), 1 + Math.round(progress * 5), { gold: true, power: 0.25 + progress * 0.4 });
+    burstAt(centre, 1 + Math.round(progress * 5), { gold: true, power: 0.25 + progress * 0.4 });
   }, 90);
   await (reached || wait(ms));
   clearInterval(twinkle);
 
-  row.classList.remove('spot');
   beams.forEach((beam) => beam.classList.remove('on'));
   setTimeout(() => beams.forEach((beam) => beam.remove()), 600);
   if (synthesized) sound.crash();
@@ -315,10 +315,11 @@ async function drumRoll(row, cueSeconds, tease = false) {
 async function bigReveal(row, index, text, settings, withDrumRoll) {
   const isTop = index === 0;
   const span = row.querySelector('.row-text span');
-  row.classList.add('lifted');
 
-  if (withDrumRoll) await drumRoll(row, settings.drumrollCue, !isTop);
+  // Lift the row above the dimmer only after the drum roll, so it doesn't give the answer away.
+  if (withDrumRoll) await drumRoll(settings.drumrollCue, !isTop);
   else dim(0.5);
+  row.classList.add('lifted');
 
   // Lay the answer out at its final size inside the bar, hidden for now.
   span.textContent = text;
@@ -403,7 +404,8 @@ async function bigReveal(row, index, text, settings, withDrumRoll) {
 
   const centre = { x: left, y: top, w: bigW, h: bigH };
   setTimeout(() => {
-    sound.ding();
+    // On the top answer the drum roll's beat drop is the reveal sound, so no ding over it.
+    if (!(isTop && withDrumRoll)) sound.ding();
     burstAt(centre, withDrumRoll ? 190 : 50, { gold: isTop, power: withDrumRoll ? 1.25 : 0.8 });
   }, total * slam * 0.8);
   if (withDrumRoll) {
